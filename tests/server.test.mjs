@@ -1,0 +1,10 @@
+import {test,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {spawn} from 'node:child_process';
+const port=3219,base=`http://127.0.0.1:${port}`;
+const proc=spawn(process.execPath,['server.mjs'],{env:{...process.env,PORT:String(port)},stdio:'pipe'});
+await new Promise((resolve,reject)=>{proc.stdout.once('data',resolve);proc.once('error',reject);proc.once('exit',code=>reject(Error('Server exited: '+code)));});
+after(()=>proc.kill());
+test('serves the application and blocks unknown assets',async()=>{assert.equal((await fetch(base)).status,200);assert.equal((await fetch(base+'/server.mjs')).status,404);assert.equal((await fetch(base+'/data/state.json')).status,404);});
+test('rejects cross-site writes',async()=>{assert.equal((await fetch(base+'/api/state',{method:'PUT',headers:{Origin:'https://example.com'},body:'{}'})).status,403);});
+test('rejects arbitrary CLI execution and malformed data',async()=>{for(const body of ['{"provider":"welink","action":"send"}','{"provider":"__proto__","action":"constructor"}','invalid'])assert.equal((await fetch(base+'/api/cli',{method:'POST',body})).status,400);assert.equal((await fetch(base+'/api/state',{method:'PUT',body:'{}'})).status,400);});
