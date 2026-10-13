@@ -1,5 +1,5 @@
 // Offline contract fixture. Used only when explicitly selected by tests via *_CLI_ENTRY.
-import { appendFile, readFile } from 'node:fs/promises';
+import { appendFile, readFile, writeFile } from 'node:fs/promises';
 let args=process.argv.slice(2);
 while(['--profile','--server-url','--workspace-id'].includes(args[0]))args=args.slice(2);
 const flag=k=>args[args.indexOf(k)+1];
@@ -7,7 +7,14 @@ if(process.env.OSO_FIXTURE_LOG)await appendFile(process.env.OSO_FIXTURE_LOG,JSON
 const output=v=>console.log(JSON.stringify(v));
 const issue={id:'issue-1',identifier:'LAB-7',title:'集成验证任务',status:'done',workspace_id:'ws-1'};
 if(args[0]==='workspace')output([{id:'ws-1',name:'测试工作区'}]);
-else if(args[0]==='agent')output([{id:'agent-1',name:'测试 Agent',status:'idle',model:'fixture-model',runtime_id:'runtime-1',workspace_id:'ws-1'}]);
+else if(args[0]==='agent'){
+ const file=process.env.OSO_FIXTURE_LOG+'.agents.json';let agents=[];try{agents=JSON.parse(await readFile(file,'utf8'));}catch{}
+ if(args[1]==='create'&&args.includes('--help'))console.log('agent create --name string --runtime-id string --instructions string --model string --output string');
+ else if(args[1]==='create'){
+  const agent={id:'created-'+(agents.length+1),name:flag('--name'),instructions:flag('--instructions'),runtime_id:flag('--runtime-id'),workspace_id:'ws-1',model:args.includes('--model')?flag('--model'):'fixture-model',status:'idle'};
+  agents.push(agent);await writeFile(file,JSON.stringify(agents));output(agent);
+ }else output([{id:'agent-1',name:'测试 Agent',status:'idle',model:'fixture-model',runtime_id:'runtime-1',workspace_id:'ws-1'},...agents]);
+}
 else if(args[0]==='runtime')output([{id:'runtime-1',name:'测试 Runtime',status:'online',provider:'fixture'}]);
 else if(args[0]==='project')output([{id:'project-1',title:'测试项目',status:'in_progress'}]);
 else if(args[0]==='issue'&&args[1]==='list')output({issues:[issue],has_more:false,total:1,limit:50,offset:0});
